@@ -1,6 +1,8 @@
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template_string, escape
 import sqlite3
 import os
+import re
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
@@ -8,11 +10,11 @@ app = Flask(__name__)
 def login():
     username = request.form['username']
     password = request.form['password']
-    # Insecure SQL query construction
-    query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
+    # Secure SQL query construction using parameterized queries
+    query = "SELECT * FROM users WHERE username = ? AND password = ?"
     connection = sqlite3.connect('application.db')
     cursor = connection.cursor()
-    cursor.execute(query)  # Execution of unsanitized input
+    cursor.execute(query, (username, password))  # Execution of parameterized query
     result = cursor.fetchone()
     if result:
         return 'Login Successful!'
@@ -22,22 +24,31 @@ def login():
 @app.route('/comment', methods=['GET'])
 def comment():
     user_input = request.args.get('text')
-    return render_template_string(f'User comment: {user_input}')  # Directly rendering user input without sanitization
+    # Escaping user input to prevent XSS
+    safe_user_input = escape(user_input)
+    return render_template_string(f'User comment: {safe_user_input}')  # Rendering escaped user input
 
 @app.route('/ping', methods=['GET'])
 def ping():
     host = request.args.get('host')
-    command = f"ping -c 1 {host}"  # Taking a host parameter directly from user input
-    result = os.popen(command).read()  # Executing the command without validation or sanitization
-    return f'<pre>{result}</pre>'
+    # Validate and sanitize the host parameter to prevent command injection
+    if not re.match(r'^[a-zA-Z0-9.-]+$', host):
+        return 'Invalid host'
+    command = f"ping -c 1 {host}"  # Using a sanitized host parameter
+    result = os.popen(command).read()  # Executing the command
+    return f'<pre>{escape(result)}</pre>'
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
     file = request.files['file']
-    filename = file.filename
+    # Use secure_filename to prevent directory traversal attacks
+    filename = secure_filename(file.filename)
+    if not filename:
+        return 'No selected file'
     file_path = os.path.join('uploads', filename)
-    file.save(file_path)  # Saving the file without checking its content, leading to potential arbitrary file upload
+    # Save the file with a secure filename
+    file.save(file_path)
     return f'File uploaded successfully to {file_path}.'
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)  # Disable debug mode for production
