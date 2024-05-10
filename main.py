@@ -1,10 +1,12 @@
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template_string, escape
+import re
 
 app = Flask(__name__)
 
 @app.route('/view-file')
 def view_file():
-    file_name = request.args.get('file')  # User-supplied input without proper sanitization
+    file_name = request.args.get('file')
+    file_name = re.sub('[^A-Za-z0-9.]+', '', file_name)
     try:
         with open(file_name, 'r') as file:
             content = file.read()
@@ -14,7 +16,8 @@ def view_file():
 
 @app.route('/search')
 def search():
-    query = request.args.get('query')  # User-supplied input without proper escaping
+    query = request.args.get('query')
+    query = escape(query)
     return render_template_string('<h1>Search Results</h1><p>No results found for: ' + query + '</p>')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -22,14 +25,10 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        
-        # This is a mock SQL query to demonstrate vulnerability. In a real scenario, this would be executed against a database.
-        query = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'"
-        
-        # Vulnerable SQL query execution (hypothetical)
-        # For demonstration only. Do not execute SQL queries this way.
-        print("Executing query: " + query)
-        
+        query = 'SELECT * FROM users WHERE username = ? AND password = ?'
+        parameters = [username, password]
+        print('Executing query: ' + query)
+        print('With parameters: ' + str(parameters))
         return render_template_string('<h1>Login Successful</h1><p>Welcome back, ' + username + '!</p>')
     else:
         return '''
