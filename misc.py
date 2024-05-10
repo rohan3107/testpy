@@ -9,10 +9,10 @@ def login():
     username = request.form['username']
     password = request.form['password']
     # Insecure SQL query construction
-    query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
+    query = "SELECT * FROM users WHERE username = ? AND password = ?"
     connection = sqlite3.connect('application.db')
     cursor = connection.cursor()
-    cursor.execute(query)  # Execution of unsanitized input
+    cursor.execute(query, (username, password, ))  # Execution of unsanitized input
     result = cursor.fetchone()
     if result:
         return 'Login Successful!'
